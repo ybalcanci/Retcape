@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Some Game</title>
+    <style>
+    	* { padding: 0; margin: 0; }
+    	canvas { 
+			background: #E7EE98; 
+			display: block; 
+			margin: 0 auto; 
+		}
+		#controls {
+			border: 3px solid green;
+			padding: 10px;
+			margin: 10px 0;
+		}
+		.header {
+			text-align: center;
+			color: red;
+			font-size: large;
+			padding: 5px;
+		}
+		.body {
+			text-align: center;
+			font-size: large;
+			padding: 0 0 5px 0;
+		}
+		#explaination {
+			text-align: center;
+			border: 3px solid green;
+			padding: 10px;
+		}
+    </style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="960" height="540"></canvas>
+<article id="controls">
+<div class="header"><b>KONTROLLER</b></div>
+<div class="body">Bu oyunu yön tuşlarıyla veya farenizle oynayabilirsiniz.</div>
+</article>
+<article id="explaination">
+<div class="header"><b>AMAÇ</b></div>
+<p class="body">Yön tuşlarıyla hareket ederek yukarıdan düşen tuğlalardan kaçmalısınız. 
+<br>Tuğlalar alt sınırı geçtikçe puan kazanacaksınız. Bir tuğlaya çarparsanız kaybedersiniz.
+<br>Skorunuz belirli barajlarıaştıkça tuğlalar hızlanacak ve tuğla başına kazandığınız puan artacaktır. 
+<br>Not: Fazla Can sistemi henüz hayata geçmedi.</p>
+</article>
+<script>
+var canvas = document.getElementById("myCanvas");
+var ctx = canvas.getContext("2d");
+
+/*
+Tuğla objesi, oyundaki engeller, x ve y koordinatlarından oluşur. Objeler program içinde rastgele
+bir x değeri ve 0 ön tanımlı y değeriyle oluşturulur. Böylece ekranın en üstünde
+fakat yatay olarak rastgele bir pozisyonda bir tuğla objesi elde edilmiş olur.
+Daha sonra program çalıştıkça y koordinatı artırılarak objeler aşağı doğru
+hareket ettirilir.
+*/
+class Brick{
+	constructor(x){
+		this.x = x;
+		this.y = 0;
+	}
+}
+
+var paddleSpeedX = 7;
+var paddleSpeedY = 7;
+
+/*
+Paddle, oyunda bizim kontrol ettiğimiz dikdörtgeni temsil ediyor.
+Boy, en ve başlama anındaki x ile y koordinatlarını burada belirliyoruz.
+*/
+var paddleHeight = 40;
+var paddleWidth = 40;
+var paddleX = (canvas.width-paddleWidth)/2;
+var paddleY = canvas.height - paddleHeight;
+
+//Klavye tuşlarına basıldığında true olacak değerler, false ön tanımlandılar.
+var rightPressed = false;
+var leftPressed = false;
+var upPressed = false;
+var downPressed = false;
+
+//Her stage'de bir fazla can vermek için tuttuğumuz kontrol değerleri.
+var stage2ExtraGiven = false;
+var stage3ExtraGiven = false;
+var stage4ExtraGiven = false;
+
+//Oyunda yukarıdan aşağı giden her bir tuğla bir bricktir.
+var brickWidth = 100;
+var brickHeight = 40;
+
+/*
+Oyun içinde değişen, dinamik değişkenler.
+Stage atlandıkça tuğlaların kazandırdıkları puanlar ve tuğla hızları değişir,
+fazla can eklenir. Ayrıca stagelerden bağımsız olarak her 30sn'de bir de 
+bir fazla can eklenir.
+*/
+var score = 0;
+var scorePerBrick = 1;
+var brickSpeed = 4;
+var extraLife = 0;
+
+/*
+Tuğla objelerinden oluşan liste. Ekranda görünen tuğlalar bu listede yer alacakken,
+ekrandan çıkanlar listeden silinecek. generateBrick fonksiyonu çağrıldıkça bu listeye
+yeni tuğlalar eklenecek.
+*/
+var bricks = [];
+
+/*
+bricks listesinde yer alan tuğlaları çizer ve her tuğlanın y koordinatlarını 
+artırarak aşağı doğru hareket etmelerini sağlar.
+*/
+function drawBricks() {
+    for(var c = 0; c < bricks.length; c++) {
+		var brickX = bricks[c].x;
+		var brickY = bricks[c].y;
+		ctx.beginPath();
+		ctx.rect(brickX, brickY, brickWidth, brickHeight);
+		ctx.fillStyle = "#068929";
+		ctx.fill();
+		ctx.closePath();
+		bricks[c].y += brickSpeed;
+    }
+}
+function stage2(){
+	scorePerBrick = 2;
+	brickSpeed = 6;
+	if(!stage2ExtraGiven){
+		extraLife++;
+		stage2ExtraGiven = true;
+	}
+}
+function stage3(){
+	scorePerBrick = 3;
+	brickSpeed = 8;
+	paddleSpeedX = 8;
+	paddleSpeedY = 8;
+	if(!stage3ExtraGiven){
+		extraLife++;
+		stage3ExtraGiven = true;
+	}
+}
+function stage4(){
+	scorePerBrick = 5;
+	brickSpeed = 10;
+	paddleSpeedX = 9;
+	paddleSpeedY = 9;
+	if(!stage4ExtraGiven){
+		extraLife++;
+		stage4ExtraGiven = true;
+	}
+}
+
+//skoru ekrana çizer.
+function drawScore(){
+	ctx.beginPath();
+	ctx.fillStyle = "#0095DD";
+	ctx.font="20px Verdana";
+	ctx.fillText("Skor: " + score, 10, 25);
+}
+
+//fazla canı ekrana çizer.
+function drawExtraLife(){
+	ctx.beginPath();
+	ctx.fillStyle = "#0095DD";
+	ctx.font="20px Verdana";
+	ctx.fillText("Fazla Can: " + extraLife, 810, 25);
+}
+
+//tuğla objesi oluşturur.
+function generateBrick() {
+	if(score >= 500){
+		stage4();
+	}
+	else if(score >= 150){
+		stage3();
+	}
+	else if(score >= 15){
+		stage2();
+	}
+	if(bricks.length < 10){
+		var newBrick = new Brick(Math.random()*(canvas.width - brickWidth));
+		bricks.length = bricks.push(newBrick);
+	}
+}
+
+//fazla can değerini bir artırır.
+function gainExtraLife(){
+	extraLife++;
+}
+
+//oyun objemizi çizer, ok tuşlarına basılma durumuna göre pozisyonunu değiştirir.
+function drawPaddle(){
+    ctx.rect(paddleX, paddleY, paddleWidth, paddleHeight);
+    ctx.fillStyle = "#6B0689";
+    ctx.fill();	
+    ctx.closePath();
+	if(rightPressed && paddleX < canvas.width-paddleWidth) {
+		paddleX += paddleSpeedX;
+	}
+	else if(leftPressed && paddleX > 0) {
+		paddleX -= paddleSpeedX;
+	}
+	if(downPressed && paddleY < canvas.height-paddleHeight) {
+		paddleY += paddleSpeedY;
+	}
+	else if(upPressed && paddleY > 0) {
+		paddleY -= paddleSpeedY;
+	}
+}
+
+//çizme fonksiyonlarının tamamı bu fonsiyon içinde çalıştırılır.
+function draw(){
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	drawPaddle();
+	drawBricks();
+	collisionDetection();
+	drawScore();
+	drawExtraLife();
+	requestAnimationFrame(draw);
+}
+
+//klavye ve fare girdilerini tanımlıyoruz.
+document.addEventListener("keydown", keyDownHandler, false);
+document.addEventListener("keyup", keyUpHandler, false);
+document.addEventListener("mousemove", mouseMoveHandler, false);
+
+function keyDownHandler(e) {
+    if(e.keyCode == 39) {
+        rightPressed = true;
+    }
+    else if(e.keyCode == 37) {
+        leftPressed = true;
+    }
+	else if(e.keyCode == 38) {
+        upPressed = true;
+		paddleSpeedX = 12;
+    }
+	else if(e.keyCode == 40) {
+        downPressed = true;
+		paddleSpeedX = 12;
+    }
+}
+
+function mouseMoveHandler(e) {
+    var relativeX = e.clientX - canvas.offsetLeft;
+    if(relativeX > 0 && relativeX < canvas.width) {
+        paddleX = relativeX - paddleWidth/2;
+    }
+	if(e.clientY > 0 && e.clientY < canvas.height - paddleHeight) {
+        paddleY = e.clientY;
+    }
+}
+
+function keyUpHandler(e) {
+    if(e.keyCode == 39) {
+        rightPressed = false;
+    }
+    else if(e.keyCode == 37) {
+        leftPressed = false;
+    }
+	else if(e.keyCode == 38) {
+        upPressed = false;
+		paddleSpeedX = 7;
+    }
+	else if(e.keyCode == 40) {
+        downPressed = false;
+		paddleSpeedX = 7;
+    }
+}
+
+/*
+Çarpışma kontrolü bu fonksiyon ile sağlanır.
+Hem tuğlaların alt duvara çarptığı, puan kazanılan durumu hem de
+tuğlanın oyun objesini çarptığı, oyunun bittiği durumu kontrol eder.
+*/
+function collisionDetection() {
+    for(var c = 0; c < bricks.length; c++) {
+        var b = bricks[c];
+		if(b.y > canvas.height){
+			bricks.splice(c, 1);
+			score += scorePerBrick;
+		}
+        if(paddleX + paddleWidth > b.x && paddleX < b.x+brickWidth && paddleY < b.y + brickHeight && paddleY + paddleHeight > b.y) {
+			if(extraLife == 0){
+				alert("Oyun Bitti. Skor: " + score);
+				document.location.reload();	
+			}
+			else{
+				extraLife--;
+			}			
+        }
+    }
+}
+
+//Çizimler yapılır. Her 400ms'de bir tuğla üretilir. Her 30sn'de bir fazla can sağlanır.
+draw();
+setInterval(generateBrick, 400);
+setInterval(gainExtraLife, 30000);
+</script>
+
+</body>
+</html>
